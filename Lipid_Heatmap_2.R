@@ -157,13 +157,8 @@ names.mapping <- map_lipid_names(x = lab_dataset$Compound.Name)
 #shiny app
 
 library(shiny)
-library(readxl)
 library(dplyr)
 library(plotly)
-
-# Load the lab_dataset and sequences data if they are not already loaded
-# This should be done outside of the server function if the data is static and does not change
-# Otherwise, you can load it inside the server function to refresh data on app reload
 
 # Define UI for application
 ui <- fluidPage(
