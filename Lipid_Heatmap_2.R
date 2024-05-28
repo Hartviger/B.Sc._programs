@@ -1,4 +1,5 @@
-# interatice heatmap
+# Lipid heatmap 2, Working Shiny app. 
+# Here the Interactive Heatmap is possible to run, but beware that some data is lost doing the process. 
 
 #Locate data storage #fixing 
 getwd()
@@ -283,7 +284,7 @@ server <- function(input, output, session) {
     )
   })
   
-  # Render the table of p-values in the UI
+  # Render the table of p-values and logFC in the UI
   output$pValueTable <- renderDataTable({
     df <- current_data()
     df$logFC <- reactive_logFC()

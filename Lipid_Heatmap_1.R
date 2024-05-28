@@ -1,13 +1,16 @@
-#lab data 1.8 working with logFC and data is mergeed 
+# Lipid Heatmap 1, first standalone script that works. 
+# This code is my fist probably working script, that gives the intented output. 
+# Run all lines before any display. 
+
 
 #Locate data storage 
 getwd()
 
 #Set data location
-setwd("/Users/jakobhartvig/Desktop/GitHub/B.Sc.-project") 
+setwd("/Users/jakobhartvig/Desktop/GitHub/B.Sc._programs") 
 
 #Load data
-lab_dataset <-read.csv("lab_data.csv")
+lab_dataset <-read.csv("lipidomics_data.csv")
 
 #Check the data
 #View(lab_dataset)
@@ -69,7 +72,9 @@ lab_dataset <- lab_dataset %>%
   group_by(Compound.Name) %>%
   summarise_all(sum)
 
-# Used for future programing. 
+# Used for future programming. 
+# If testing this, do not run the lines between this line and "#### duplicated lipids ####"
+# After running the line below, the data frame should be fixed to _n
 # add _1 _2 _3 to duplicated names
 lab_dataset$Compound.Name <- ave(lab_dataset$Compound.Name, lab_dataset$Compound.Name, FUN = function(x) if (length(x) > 1) paste0(sub("\\(.*\\)", "", x), "_", seq_along(x), sub(".*\\(", "(", x)) else x)
 

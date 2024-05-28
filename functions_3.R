@@ -1,4 +1,6 @@
 # functions for lipid heatmap #3
+# This section of code only describes the Lipid Heatmap functions in MetaboLink, and do not work independently from all the other code done in MetaboLink. 
+# Meaning if testing of Lipid Heatmap is wanted, go to the test server linked in the B.Sc. ‘Methods and Materials’ section.
 
 # Lipid Heatmap
 # Grouping the data
