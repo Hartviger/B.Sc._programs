@@ -1055,7 +1055,9 @@ shinyServer(function(session, input, output) {
     })
     
     
+    
     # Table output of the table in the tab: 'Heatmap' used for testing. 
+    # Only testing, is not needed in the working app.
     observeEvent(input$run_process, {
       # Process your data here
       processed_results <- process_data(sequence, data)
@@ -1090,10 +1092,11 @@ shinyServer(function(session, input, output) {
     })
     
     
+    
     # Heatmap input selection  
     observeEvent(input$run_process, {
       
-      # Process your data here
+      # Process data here
       processed_results <- process_data(sequence, data)
       grouped_data_frames <- create_grouped_data_frames(sequence, data)
       grouped_data_frames_with_means <- calculate_means_for_grouped_data(grouped_data_frames)
@@ -1126,6 +1129,7 @@ shinyServer(function(session, input, output) {
                    placement = "bottem", 
                    trigger = "hover")
       })
+      
       
       # Render UI for maximum p-value input
       output$p_value_max_ui <- renderUI({
@@ -1198,7 +1202,7 @@ shinyServer(function(session, input, output) {
         
         # Filter based on the input logFC range
         filtered_data <- numerator_data[numerator_data$logFC >= reactive_min_logFC() & numerator_data$logFC <= reactive_max_logFC(), ]
-        return(filtered_data)
+        return(filtered_data) # Used for Heatmap display 
       })
       
       
@@ -1254,12 +1258,10 @@ shinyServer(function(session, input, output) {
       })
       
       
-      # Interface of selectinos of lipids to display
+      # Interface of selections of lipids to display
       output$select_lipid_ui <- renderUI({
         # Extract the lipid names from first column of the file 'data'
         lipid_names <<- group_lipids_by_class(data)
-        
-        ###### Above this in the definition of the lipid_names I instead tried to call the function. 
         
         selectizeInput("selected_lipid", "Select lipid(s) to display:",
                        choices = c("All", unique(lipid_names$Class)),
@@ -1295,7 +1297,7 @@ shinyServer(function(session, input, output) {
         req(nrow(filtered_data) > 0)
         
         # Apply any necessary filtering based on logFC
-        filtered_data <- filtered_data[filtered_data$logFC >= -2 & filtered_data$logFC <= 2, ]
+        filtered_data <- filtered_data[filtered_data$logFC >= reactive_min_logFC() & filtered_data$logFC <= reactive_max_logFC(), ]
         
         # Get the count of selected lipids
         num_of_lipids <- selected_lipid_count()

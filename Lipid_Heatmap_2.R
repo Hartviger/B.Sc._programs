@@ -1,14 +1,21 @@
 # Lipid heatmap 2, Working Shiny app. 
 # Here the Interactive Heatmap is possible to run, but beware that some data is lost doing the process. 
 
+# Load libarays 
+library(shiny)
+library(dplyr)
+library(plotly)
+library( "lipidomeR" )
+
+
 #Locate data storage #fixing 
 getwd()
 
 #Set data location
-setwd("/Users/jakobhartvig/Desktop/GitHub/B.Sc.-project") 
+setwd("/Users/jakobhartvig/Desktop/GitHub/B.Sc._programs") 
 
 #Load data
-lab_dataset <-read.csv("lab_data.csv")
+lab_dataset <-read.csv("lipidomics_data.csv")
 
 
 #Check the data
@@ -157,9 +164,6 @@ names.mapping <- map_lipid_names(x = lab_dataset$Compound.Name)
 
 #shiny app
 
-library(shiny)
-library(dplyr)
-library(plotly)
 
 # Define UI for application
 ui <- fluidPage(
