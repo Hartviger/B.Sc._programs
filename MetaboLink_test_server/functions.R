@@ -420,12 +420,18 @@ extract_pattern <- function(name) {
 # Function to format strings
 # Puts the length and double bonds numbers into a (). Eg "CAR 14:1" to "CAR(14:1)"
 format_strings <- function(input_strings) {
-  # Use gsub with regular expression to remove all whitespace characters
+  # Step 1: Remove all whitespace characters
   formatted_strings <- gsub("\\s+", "", input_strings)
-  # Add parentheses around the numbers
-  formatted_strings <- gsub("([A-Za-z]*)(\\d+):(\\d+)", "\\1(\\2:\\3)", formatted_strings)
+  
+  # Step 2: Identify and move the prefix (e.g., O-, P-) to the suffix position
+  formatted_strings <- gsub("([A-Za-z]+)(O-|P-)(\\d+):(\\d+)", "\\1-\\2(\\3:\\4)", formatted_strings)
+  
+  # Step 3: Add parentheses around the numbers for strings without the O- or P- prefix
+  formatted_strings <- gsub("([A-Za-z]+)(\\d+):(\\d+)", "\\1(\\2:\\3)", formatted_strings)
+  
   return(formatted_strings)
 }
+
 
 ### pattern_column is that corret? 
 # Function to filter rows based on the specified pattern, meaning removes any data that are not on X(C:D) format.

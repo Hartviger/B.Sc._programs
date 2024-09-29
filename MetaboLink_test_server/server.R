@@ -978,7 +978,7 @@ shinyServer(function(session, input, output) {
     # Function to filter rows based on the specified pattern, meaning removes any data that are not on X(C:D) format.
     data <- filter_data_by_pattern(data)
     
-
+    
     
     
     # This will make it possible to switch between original data and merged data. OG data: using _1 _2 ... _n. Merged will sum the values of the "duplicated" data. 
@@ -1015,6 +1015,12 @@ shinyServer(function(session, input, output) {
             nrow(data), "observations and", ncol(data), "variables in the dataset before data cleaning.")
     })
     
+    # Notification text for the UI
+    output$please_notice <- renderText({
+      data <- rv$data[[rv$activeFile]]  # or however you access your raw data
+      paste("PLEASE NOTICE THIS IS ONLY A SNAPSHOT OF THE OBSERVATIONS, NOT THE COMPLETE DATASET.!")
+    })
+    
     
     # The following is used in the tab: 'Data of groups in heatmap'.
     # Call the process_data function and use the result directly within observeEvent
@@ -1025,21 +1031,48 @@ shinyServer(function(session, input, output) {
         return()
       }
       
+      
+      
+      
+      ############################################## new
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
       # Extract the 'Sample' labels and corresponding 'class' from 'sequence'
       sample_rows <- sequence[sequence$labels == "Sample", ]
       unique_groups <- unique(sample_rows$class)
       
-      # Create the dataframe to be displayed as a table
+      # Create the dataframe to be displayed as a table with a sequential count
+      ######################################################## nyt navn
+      
       df_processed_data <- data.frame(
-        Group = unique_groups,
+        "Group id in heatmap" = seq_along(unique_groups),  # Add a count column from 1 to number of unique groups
+        "Sample id in uploaded file" = unique_groups,
         Samples = sapply(unique_groups, function(group) {
           sample_identifiers <- rownames(sample_rows)[sample_rows$class == group]
           paste(sample_identifiers, collapse = ", ")
         })
       )
+      
       # Return the data frame to be rendered as a table
       df_processed_data
     })
+    
+    
+    
+    
+    
+    
+    
     
     # Add this to render the raw data table, being displayed in "Data of groups in Heatmap"
     output$raw_data_table <- renderTable({
@@ -1053,6 +1086,9 @@ shinyServer(function(session, input, output) {
       
       return(limited_data)
     })
+    
+    
+    
     
     
     
@@ -1076,7 +1112,7 @@ shinyServer(function(session, input, output) {
       
       # Dynamically generate selectInput for group selection
       output$select_group_ui <- renderUI({
-        selectInput("selected_group", "Select Group:",
+        selectInput("selected_group", "Select Group # THIS IS FOR TESTING:",
                     choices = names(grouped_data_frames))  # Use group names as choices
       })
       
@@ -1100,27 +1136,88 @@ shinyServer(function(session, input, output) {
       processed_results <- process_data(sequence, data)
       grouped_data_frames <- create_grouped_data_frames(sequence, data)
       grouped_data_frames_with_means <- calculate_means_for_grouped_data(grouped_data_frames)
-      
+
       # Add the first column of "data" to each grouped data frame
       compound_names <- data[[1]]  # Extract the first column which contains compound names
       
       # Assuming that each grouped data frame has rows in the same order as "data"
-      for (i in seq_along(grouped_data_frames_with_means)) {
+      for (i in seq_along(grouped_data_frames)) {
         grouped_data_frames_with_means[[i]] <- cbind(Compound_Name = compound_names, grouped_data_frames_with_means[[i]])
       }
       
-      # Update the names of the grouped_data_frames if they're not already set
-      names(grouped_data_frames_with_means) <- paste("Group", seq_along(grouped_data_frames_with_means))
+      # Update the names of the grouped_data_frames using the actual group names from the sequence file
+      # Extract unique group names from sequence
+      unique_group_names <- unique(sequence[sequence$labels == "Sample", "class"])
       
-      # Create UI for group selection
+      # Ensure the number of group names matches the length of the grouped data frames
+      if (length(unique_group_names) == length(grouped_data_frames_with_means)) {
+        names(grouped_data_frames_with_means) <- unique_group_names
+      } else {
+        # If there's a mismatch, fallback to naming with numbers as before
+        names(grouped_data_frames_with_means) <- paste("Group", seq_along(grouped_data_frames_with_means))
+      }
+      
+      
+      
+      # Render the UI for group selection (same as before)
       output$select_group_ui_heatmap <- renderUI({
-        tagList(
-          selectInput("selected_group_for_numerator", "Select Group for numerator:",
-                      choices = names(grouped_data_frames_with_means)),
-          selectInput("selected_group_for_denominator", "Select Group for denominator:",
-                      choices = names(grouped_data_frames_with_means))  # Use group names as choices
+        column(
+          title = "Select groups for Heatmap",
+          width = 12,
+          
+          tagList(
+            selectInput("selected_group_for_numerator", "Select Group for numerator:",
+                        choices = names(grouped_data_frames_with_means)),
+            selectInput("selected_group_for_denominator", "Select Group for denominator:",
+                        choices = names(grouped_data_frames_with_means))
+          )
         )
       })
+      
+      
+      
+      # Create interactive table for selected numerator group with x-axis scrolling
+      output$numerator_group_table <- DT::renderDataTable({
+        req(input$selected_group_for_numerator)  # Ensure that a selection is made
+        # Create a copy of the data for display purposes
+        display_data <- grouped_data_frames_with_means[[input$selected_group_for_numerator]]
+        
+        # Remove the 'mean' column from the copy for display only
+        if ("Mean" %in% colnames(display_data)) {
+          display_data <- display_data[, !colnames(display_data) %in% "Mean"]
+        }
+        
+        # Render the data without the 'mean' column
+        DT::datatable(
+          display_data,  
+          options = list(scrollX = TRUE)  # Enable horizontal scrolling
+        )
+      })
+      
+      # Create interactive table for selected denominator group with x-axis scrolling
+      output$denominator_group_table <- DT::renderDataTable({
+        req(input$selected_group_for_denominator)  # Ensure that a selection is made
+        # Create a copy of the data for display purposes
+        display_data <- grouped_data_frames_with_means[[input$selected_group_for_denominator]]
+        
+        # Remove the 'mean' column from the copy for display only
+        if ("Mean" %in% colnames(display_data)) {
+          display_data <- display_data[, !colnames(display_data) %in% "Mean"]
+        }
+        
+        # Render the data without the 'mean' column
+        DT::datatable(
+          display_data,  
+          options = list(scrollX = TRUE)  # Enable horizontal scrolling
+        )
+      })
+      
+      
+      
+      
+      
+      
+      
       
       # Message shown when hovering over Original data and merged data. # Remember to change this outside of the observe event, Search for addTooltip
       observe({
@@ -1135,7 +1232,7 @@ shinyServer(function(session, input, output) {
       output$p_value_max_ui <- renderUI({
         numericInput("p_value_max", 
                      "Maximum p-value:", 
-                     value = 0.05, 
+                     value = 1, 
                      min = 0, 
                      step = 0.01)
       })
@@ -1144,7 +1241,7 @@ shinyServer(function(session, input, output) {
       output$logFC_input_ui <- renderUI({
         numericInput("logFC_input", 
                      "Enter logFC value:", 
-                     value = 2)
+                     value = 5)
       })
       
       # Dynamic p-values depended on interface
@@ -1179,6 +1276,7 @@ shinyServer(function(session, input, output) {
         # The required data input for the data handling. 
         req(input$selected_group_for_numerator, input$selected_group_for_denominator)
         req(reactive_max_logFC(), reactive_min_logFC())
+        print(input$selected_group_for_numerator)
         
         # Define data input, makes it more readable 
         numerator_data <- grouped_data_frames_with_means[[input$selected_group_for_numerator]]
@@ -1208,14 +1306,22 @@ shinyServer(function(session, input, output) {
       
       
       
-      # Calculation of p-value, using t-test
       reactiveP_value <- reactive({
         req(input$selected_group_for_numerator, input$selected_group_for_denominator)
         
         numerator_data <- grouped_data_frames_with_means[[input$selected_group_for_numerator]]
         denominator_data <- grouped_data_frames_with_means[[input$selected_group_for_denominator]]
+     
+        #numerator_data <- numerator_data[, -6]
+        #denominator_data <- denominator_data[, -6]
+        #print(numerator_data)
+        #print(denominator_data)
+        numerator_data <- numerator_data[, !names(numerator_data) %in% "Mean"]
+        denominator_data <- denominator_data[, !names(denominator_data) %in% "Mean"]
         
-        if(nrow(numerator_data) == 0 || nrow(denominator_data) == 0) {
+        
+        # Ensure there is data to work with
+        if (nrow(numerator_data) == 0 || nrow(denominator_data) == 0) {
           return(NULL)
         }
         
@@ -1224,20 +1330,30 @@ shinyServer(function(session, input, output) {
         
         # Loop through each row to perform the t-test
         for (i in 1:nrow(numerator_data)) {
-          t_test_result <- t.test(numerator_data[i, -1], denominator_data[i, -1])
-          p_values[i] <- t_test_result$p.value
+          num_values <- unlist(numerator_data[i, -1])
+          denom_values <- unlist(denominator_data[i, -1])
+          
+          # Check if data is constant or contains NA values
+          if (length(unique(num_values)) == 1 || length(unique(denom_values)) == 1 ||
+              any(is.na(num_values)) || any(is.na(denom_values))) {
+            p_values[i] <- NA  # Assign NA or another appropriate value
+          } else {
+            t_test_result <- t.test(num_values, denom_values)
+            p_values[i] <- t_test_result$p.value
+          }
         }
         
-        # store the data
+        # Store the data
         numerator_data$p_values <- p_values
         
-        # Filtrate/store the data, so it is ready to display in table in 'Heatmap'.
+        # Filter/store the data, so it is ready to display in table in 'Heatmap'.
         filtered_data <- numerator_data %>%
           mutate(p_value = p_values) %>%
           filter(p_value <= input$p_value_max)
         
         return(filtered_data[, c("Compound_Name", "p_values")])
       })
+      
       
       
       # Combine both logFC and p-values into one reactive expression
@@ -1284,14 +1400,182 @@ shinyServer(function(session, input, output) {
       
       
       
-      # Heatmap display
-      # Use the reactive expression in renderPlotly
+      
+      
+      # Reactive expression for bubble plot data and height
+      bubble_plot_data <- reactive({
+        # Step 1: Load the filtered data
+        filtered_data <- reactiveLogFC()
+        
+        # Take input from user in interface and change p-value and logFC
+        filtered_data <- reactiveFilteredData()
+        
+        # Ensure the data is not NULL and has rows to plot
+        req(nrow(filtered_data) > 0)
+        
+        # Apply filtering based on logFC
+        filtered_data <- filtered_data[filtered_data$logFC >= reactive_min_logFC() & filtered_data$logFC <= reactive_max_logFC(), ]
+        
+        # Map the lipid names (make sure it returns all necessary columns, including Lipid_Class)
+        names.mapping <- map_lipid_names(x = filtered_data$Compound_Name)
+        
+        # Create a data frame containing the necessary lipid information
+        lipid_data <- data.frame(
+          Compound.Name = names.mapping$Name,
+          Lipid_Class = names.mapping$Name.simple,  
+          Carbon_Length = names.mapping$N.carbons,
+          Double_Bonds = names.mapping$N.double.bonds,
+          Concentration = filtered_data$logFC,
+          p_value = filtered_data$p_value,
+          Class = names.mapping$Class  # Ensure we are grouping by class
+        )
+        
+        # Filter out rows with any NA values
+        lipid_data <- lipid_data[complete.cases(lipid_data), ]
+        
+        # Define size bins for the p-values with appropriate labels
+        lipid_data$size_category <- cut(
+          lipid_data$p_value,
+          breaks = c(-Inf, 0.00001, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.2, Inf),
+          labels = c("p ≤ 1e-5", "1e-5 < p ≤ 1e-4", "1e-4 < p ≤ 0.001", "0.001 < p ≤ 0.01",
+                     "0.01 < p ≤ 0.05", "0.05 < p ≤ 0.1", "0.1 < p ≤ 0.2", "p > 0.2"),
+          include.lowest = TRUE,
+          right = TRUE  # Include the right end of intervals
+        )
+        
+        # Remove any NA values in size_category
+        lipid_data <- lipid_data[!is.na(lipid_data$size_category), ]
+        
+        # Define sizes for each category
+        size_values <- c(20, 17, 15, 13, 11, 9, 8, 7)
+        names(size_values) <- levels(lipid_data$size_category)
+        
+        # Calculate the number of unique classes
+        num_classes <- length(unique(lipid_data$Class))
+        
+        # Calculate number of rows in the facets
+        ncol_facets <- 3  # Adjust based on your facet_wrap setting
+        num_rows <- ceiling(num_classes / ncol_facets)
+        
+        # Set base height per row
+        height_per_row <- 300  # Adjust as needed to match heatmap scaling
+        
+        # Calculate total plot height
+        total_plot_height <- num_rows * height_per_row
+        
+        # Ensure minimum and maximum height limits
+        total_plot_height <- max(total_plot_height, 600)   # Minimum height
+        total_plot_height <- min(total_plot_height, 4000)  # Maximum height
+        
+        
+        
+        
+        bubble_plot <- ggplot(lipid_data, aes(x = Carbon_Length, y = Double_Bonds, size = size_category, 
+                                              color = Concentration)) +
+          geom_point(alpha = 0.7) +
+          scale_color_gradient2(
+            low = "#4575b4",         # Same as in heatmap
+            mid = "white",           # Same as in heatmap
+            high = "#d73027",        # Same as in heatmap
+            midpoint = 0,            # Same as in heatmap
+            limit = c(-2.5, 2.5),    # Same as in heatmap
+            space = "Lab",           # Same as in heatmap
+            name = "logFC"
+          ) +
+          scale_size_manual(
+            values = size_values,
+            name = "p-value range"
+          ) +
+          facet_wrap(~ Class, scales = "free", ncol = ncol_facets) +
+          
+          
+          
+          
+          
+          theme_minimal() +
+          theme(
+            axis.text.x = element_text(angle = 90, hjust = 1, size = 10),
+            axis.text.y = element_text(size = 10),
+            strip.text = element_text(color = "black", face = "bold"),
+            strip.background = element_rect(fill = "#3483d1", color = "white"),
+            panel.background = element_rect(fill = "#D3D3D3", color = "white"),
+            panel.grid.major = element_line(color = "grey90"),
+            panel.grid.minor = element_blank(),
+            legend.position = "top",
+            legend.box = "vertical",
+            legend.title = element_text(size = 12),
+            legend.text = element_text(size = 10),
+            panel.spacing = unit(0.5, "lines")  # Increase spacing between facets
+          )
+        
+        
+        # Convert ggplot to plotly object with dynamic height
+        p <- ggplotly(bubble_plot, width = 1000, height = total_plot_height)
+        
+        # Modify the colorbar position
+        for (i in seq_along(p$x$data)) {
+          if (!is.null(p$x$data[[i]]$marker$colorbar)) {
+            p$x$data[[i]]$marker$colorbar$orientation <- "h"
+            p$x$data[[i]]$marker$colorbar$x <- 0.5
+            p$x$data[[i]]$marker$colorbar$y <- 1.05
+            p$x$data[[i]]$marker$colorbar$xanchor <- "center"
+            p$x$data[[i]]$marker$colorbar$yanchor <- "bottom"
+            p$x$data[[i]]$marker$colorbar$lenmode <- "pixels"
+            p$x$data[[i]]$marker$colorbar$len <- 300
+            p$x$data[[i]]$marker$colorbar$thickness <- 15
+          }
+        }
+        
+        # Adjust the legend position
+        p <- p %>%
+          layout(
+            legend = list(
+              orientation = "h",
+              x = 0.5,
+              y = 1.15,
+              xanchor = "center",
+              yanchor = "bottom"
+            ),
+            margin = list(t = 150)
+          )
+        
+        # Return the plot and height
+        list(plot = p, height = total_plot_height)
+      })
+      
+      # Render the bubble plot
+      output$bubble_plot <- renderPlotly({
+        bubble_plot_data()$plot
+      })
+      
+      # UI for dynamic height
+      output$bubble_plot_ui <- renderUI({
+        plot_data <- bubble_plot_data()
+        plot_height <- plot_data$height
+        
+        plotlyOutput("bubble_plot", width = "100%", height = paste0(plot_height, "px"))
+      })
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
       output$heatmapPlot <- renderPlot({
         filtered_data <- reactiveLogFC()
         
         # Take the input from user in interface and change p-value and logFC
         filtered_data <- reactiveFilteredData()
-        
         
         # Ensure the data is not NULL and has rows to plot
         req(nrow(filtered_data) > 0)
@@ -1302,17 +1586,7 @@ shinyServer(function(session, input, output) {
         # Get the count of selected lipids
         num_of_lipids <- selected_lipid_count()
         
-        
-        # Adjust text size based on the count of selected lipids
-        lipid_text_size <- if (num_of_lipids < 5) {
-          10  # Smaller number of lipids, larger text
-        } else if (num_of_lipids == Inf) {
-          4  # "All" is selected, use default text size
-        } else {
-          5   # More than 5 lipids, smaller text
-        }        
-        # Ensure compound_names are available. If compound_names were defined earlier,
-        # make sure they are accessible here, either as reactive values or as global variables.
+        # Ensure compound_names are available
         names.mapping <- map_lipid_names(x = filtered_data$Compound_Name)
         
         heatmap_plot <- heatmap_lipidome(
@@ -1320,29 +1594,71 @@ shinyServer(function(session, input, output) {
           names.mapping = names.mapping,
           class.facet = "wrap",
           x.names = "Compound_Name",
-          fill.limits = c(-2.5, 2.5), # Set limits to include -2.5 to 2.5
-          fill.midpoint = 2.5, # Set midpoint explicitly to 2.5
+          fill.limits = c(-2.5, 2.5),
+          fill.midpoint = 2.5,
           melt.value.name = "logFC",
           scales = "free"
         ) +
           scale_fill_gradient2(
-            low = "blue",       # Color for low values
-            mid = "white",     # Color for midpoint values
-            high = "red",     # Color for high values
-            midpoint = 0,      # Midpoint value, adjust as needed (e.g., the neutral point in your data)
-            limit = c(-2.5, 2.5),  # Limits for the scale
-            space = "Lab",     # Color space in which to calculate gradient
-            name = "logFC"     # Legend title
+            low = "#4575b4",
+            mid = "white",
+            high = "#d73027",
+            midpoint = 0,
+            limit = c(-2.5, 2.5),
+            space = "Lab",
+            name = "logFC"
           ) +
-          scale_x_continuous(
-            breaks = scales::pretty_breaks(n = lipid_text_size)  # Adjust n to control label frequency
-          ) +
-          scale_y_continuous(
-            breaks = scales::pretty_breaks(n = lipid_text_size)  # Adjust n as needed for the y-axis
-          ) 
+          facet_wrap(~ Class, scales = "free", ncol = 3) +
+          
+          # Use the named vector for lipid N.carbons labels
+          
+          theme(
+            panel.background = element_rect(fill = "#D3D3D3", color = "white"),
+            strip.background = element_rect(fill = "#3483d1", color = "white"),
+            strip.text = element_text(color = "black", face = "bold"),
+            axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)  # Rotate lipid names for readability
+          )
+        
         # Return the heatmap plot
         heatmap_plot
+        
       })
+      
+      
+      
+      
+      
+      
+      output$heatmap_ui <- renderUI({
+        # Use the reactive expression to get the number of selected lipids or if "All" is selected
+        num_selected_lipids <- selected_lipid_count()
+        
+        # Dynamically adjust the height based on the number of selected lipids using nested ifelse
+        height <- ifelse(num_selected_lipids > 0 & num_selected_lipids <= 3, "800px", 
+                         ifelse(num_selected_lipids > 3 & num_selected_lipids <= 6, "1200px", "2000px"))
+        
+        plotOutput("heatmapPlot", width = "100%", height = height)
+      })
+      
+      
+      
+      output$lipid_class_count <- DT::renderDataTable({
+        lipid_names <<- group_lipids_by_class(data)
+        lipid_class_count <- table(lipid_names$Class)  # Note the use of names.mapping() to access the reactive value
+        lipid_class_df <- as.data.frame(lipid_class_count)
+        colnames(lipid_class_df) <- c("Lipid Class", "Count")
+        
+        # Return the data frame as a datatable
+        DT::datatable(lipid_class_df, options = list(pageLength = 5, autoWidth = TRUE))
+      })
+      
+      
+      
+      
+      
+      
+      
+      
       
       
       
@@ -1373,12 +1689,7 @@ shinyServer(function(session, input, output) {
     })
     
     
-    # Update the UI message 
-    output$table_message <- renderUI({
-      if (values$runProcessClicked) {
-        HTML('<p>Data processing complete, see tables below.</p>')
-      }
-    })
+    
     
   }) # This finishes the first 'observeEvent' when 'Run data processing' is clicked
   
@@ -1397,26 +1708,16 @@ shinyServer(function(session, input, output) {
                trigger = "hover")
   })
   
+  
+  ##############################
   # User guide inside 'Heatmap'
-  observeEvent(input$show_help, {
+  observeEvent(input$show_lipid_info, {
     showModal(modalDialog(
-      title = "User Guide for the Lipid Heatmap",
-      tags$ul(tags$li(tags$b("This Heatmap is designed for comparative lipidomic analysis."))),
-      tags$ul("The user guide will explain how to use the Heatmap visualization.",
-              tags$li("Upon clicking 'Run Data Processing', the app cleans the data and prepares it for plotting. This process may take a few seconds due to extensive data handling. The 'Data of groups in Heatmap' tab allows you to view the distribution of samples across groups."),
-              tags$li("Original Data vs. Merged Data: Switch between 'Original Data' and 'Merged Data' by selecting the desired option and then clicking 'Run Data Processing'. This action will automatically reset the heatmap plot and any selected scales to their default settings."),
-              tags$li(tags$b("When using the Heatmap:")),
-              tags$li("Select groups for comparison from the dropdown menus."),
-              tags$li("The heatmap will automatically update to display the data for the chosen groups."),
-              tags$li("To display specific lipids, use 'Select lipid(s) to display:' to type or click your selections. To remove selections, use 'Backspace' on your keyboard. If there are no display of the selected lipids, if may be due to the thresholds of logFC and P-value"),
-              tags$li("Adjustments to logFC and P-values are available. Click on 'Enter max logFC value' or 'Maximum P-value:' to enter new thresholds. The application accepts both comma and period as decimal separators. Lipids will be displayed within the specified logFC and P-value ranges. For instance, entering a logFC of 2 will automatically consider a range from -2 to 2."),
-              tags$li("For further details on lipid data, scroll down to the table beneath the heatmap."),
-              tags$li(tags$b("Data Calculations:")),
-              tags$li("The color scale of the heatmap represents log-fold change (logFC) values. LogFC is computed as log2((numerator_data$Mean + 1e-6) / (denominator_data$Mean + 1e-6)), where numerator_data and denominator_data correspond to the groups selected. An offset of 1e-6 is included to avoid division by zero. The logFC scale is set to span from -2.5 to 2.5."),
-              tags$li("P-values are determined using the 't.test' function in R, which conducts a statistical comparison between corresponding rows of lipid data from the selected groups."),
-              
-              
-      ),
+      title = "Lipid summeray",
+      textOutput("rows_removed_text"),
+      textOutput(" "),
+      dataTableOutput("lipid_class_count"),
+      
       easyClose = TRUE,
       footer = modalButton("Close")
     ))

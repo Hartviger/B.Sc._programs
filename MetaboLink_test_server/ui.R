@@ -19,8 +19,10 @@ library(stringi)
 library(BiocManager)
 library(shinycssloaders)
 library(jsonlite)
-
+library(reshape2)
 library("lipidomeR") # new
+library(ggh4x) # new
+
 
 options(repos = BiocManager::repositories())
 source("functions.R")
@@ -30,7 +32,12 @@ source("normalization.R")
 
 shinyUI(dashboardPage(
   dashboardHeader(
-    title = "MetaboLink",
+    title = tags$div(
+      tags$img(  src = "/Users/jakobhartvig/Desktop/uni/7_semester/ISA_kandidat/September/MetaboLink_test_of_test_server/logo.png",
+                 style = "height: auto; width: auto; max-height: 30px; max-width: 53px; vertical-align: middle; margin-right: 10px;"
+      ), # Adjust path and styling
+      "MetaboLink TEST SERVER"
+    ),
     titleWidth = 400,
     dropdownMenu(type = "notifications",
                  icon = icon("question-circle"),
@@ -44,6 +51,7 @@ shinyUI(dashboardPage(
                                   href = "https://www.sdu.dk/en")
     )
   ),
+  
   
   # Sidebar 
   
@@ -372,64 +380,118 @@ shinyUI(dashboardPage(
             ),
             
             
-            # Lipid Heatmap 
+            
+            
+            
+            
+            
+            
+            
+            
             tabPanel("Lipid Heatmap",
-                     useShinyjs(), # Enable Shiny JavaScript operations for enhanced UI interactions.
+                     useShinyjs(),
                      tabsetPanel(
-                       # Heatmap Visualization tab: Provides UI elements for processing and visualizing heatmap data.
-                       tabPanel("Heatmap Visualization",
-                                actionButton("run_process", "Run Data Processing"), # Button to trigger data processing.
-                                actionButton("show_help", "Show User Guide"), # Button to display a user guide or help information.
-                                radioButtons("selected_dataset", "Select data frame:", # Radio buttons for selecting the dataset type.
-                                             choices = c("Original Data" = "original", "Merged Data" = "merged"),
-                                             selected = "original"),
-                                
-                                
-                                textOutput("upload_message"), # Message area for displaying upload status or instructions.
-                                column(width = 4,  # Adjust width as necessary for your layout
-                                       # Place the components that should go in the second column here
-                                       uiOutput("select_group_ui_heatmap"),
-                                       tableOutput("numerator_table"),
-                                       tableOutput("denominator_table"),
+                       
+                       tabPanel("Group selection",
+                                fluidRow(
+                                  column(6, box(
+                                    width = NULL,
+                                    title = "User guide",
+                                    tags$ul(
+                                      tags$li("Select the data frame to use."),
+                                      tags$li("Click 'Run Data Processing' to start the analysis."),
+                                      tags$li("After data processing select the numerator and denominator groups."),
+                                      conditionalPanel(
+                                        condition = "input.run_process > 0", # Only display the following if data processing has been triggered.
+                                        tableOutput("groups_table"), # Shows table of groups.
+                                      )
+                                    )
+                                  )),
+                                  column(6, box(
+                                    width = NULL, 
+                                    title = "Select Data Frame", 
+                                    radioButtons("selected_dataset", "Select data frame:",
+                                                 choices = c("Original Data" = "original", "Merged Data" = "merged"),
+                                                 selected = "original", width = "50%"),
+                                    
+                                    column(6, 
+                                           actionButton("run_process", "Run Data Processing"),
+                                           uiOutput("select_group_ui_heatmap"),
+                                           tableOutput("numerator_table"),
+                                           tableOutput("denominator_table"),
+                                           conditionalPanel(
+                                             condition = "input.run_process > 0", 
+                                             actionButton("show_lipid_info", "Show Lipid Summary")
+                                           )
+                                    )
+                                  ))
                                 ),
-                                column(width = 4,
-                                       uiOutput("select_lipid_ui"),
-                                ),
-                                column(width = 4,  # Adjust width as necessary for your layout
-                                       # Place the components that should go in the third column here
-                                       uiOutput("p_value_max_ui"),
-                                       uiOutput("logFC_input_ui"),
-                                ),
-                                uiOutput("lipid_display_message"),
                                 
-                                column(width = 12,
-                                       plotOutput("heatmapPlot", width = "100%", height = "650px") # Adjust height as necessary
-                                ),
-                                
-                                # Table in its own row, below the plot
-                                column(width = 12,
-                                       dataTableOutput("pValueTable")
-                                ), # Lines below in # are for testing are making sure of corrcet data. 
-                                #uiOutput("select_group_ui"), # Dynamic UI for selecting groups, populated server-side. 
-                                #tableOutput("selected_group_table"), # Displays selected groups for verification.
+                                conditionalPanel(
+                                  condition = "input.run_process > 0", 
+                                  column(6, box(
+                                    title = "Numerator Group Table",
+                                    width = NULL,
+                                    DT::dataTableOutput("numerator_group_table")  
+                                  )),
+                                  column(6, box(
+                                    title = "Denominator Group Table",
+                                    width = NULL,
+                                    DT::dataTableOutput("denominator_group_table")  
+                                  ))
+                                )
                        ),
                        
-                       # Data of groups in Heatmap tab: Displays the data behind the groups used in the heatmap.
-                       tabPanel("Data of groups in Heatmap",
-                                uiOutput("table_message"), # Dynamic message about the data table, populated server-side.
-                                conditionalPanel(
-                                  condition = "input.run_process > 0", # Only display the following if data processing has been triggered.
-                                  tableOutput("groups_table"), # Shows table of groups.
-                                  textOutput("limitation_notice"), # Notice about any limitations or considerations.
-                                  textOutput("rows_removed_text"), # Information on data rows removed during processing.
-                                  tableOutput("raw_data_table") # Displays the raw data table.
+                       # HEATMAP VISUALIZATION
+                       tabPanel("Lipid Visualization",
+                                box(
+                                  column(width = 8,
+                                         uiOutput("select_lipid_ui"),
+                                         tags$li("Lipids will show up both on Lipid Heatmap and Bubble plot if they are within the threshold of p-value and logFC."),
+                                         tags$li("Be aware of isoforms of each lipid.")
+                                  )
                                 ),
-                                verbatimTextOutput("error_message") # Area to display any error messages.
+                                box(
+                                  column(width = 4, 
+                                         uiOutput("p_value_max_ui"),
+                                         uiOutput("logFC_input_ui")
+                                  ),
+                                  column(width = 4, 
+                                         # Note: `uiOutput("logFC_input_ui")` appears twice; ensure this is intentional.
+                                  )
+                                ),
+                                
+                                div(style = "width: 100%; height: 2000px; overflow-y: scroll;",  # Adjust overflow and height
+                                    uiOutput("heatmap_ui")
+                                ),   
+                                
+                                column(width = 12,
+                                       dataTableOutput("pValueTable")
+                                )
+                                
+                       ),
+                       
+                       tabPanel(
+                         "Bubble plot of data",
+                         #checkboxInput("swap_logfc_pvalue", "Swap logFC and p-value", value = FALSE),
+                         #helpText("Bubble size represents p-value ranges. Color indicates logFC."),
+                         uiOutput("bubble_plot_ui"),
+                         
                        )
+                       
+                       
+                       
+                       
+                       
                      )
             ),
             
-
+            
+            
+            
+            
+            
+            
             
             tabPanel("Feature drift",
                      fluidRow(
